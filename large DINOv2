@@ -1,0 +1,488 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "aa9091c9",
+   "metadata": {
+    "papermill": {
+     "duration": 0.004576,
+     "end_time": "2024-05-27T21:29:51.908139",
+     "exception": false,
+     "start_time": "2024-05-27T21:29:51.903563",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## IMC24 Starter for Image Matching Challenge 2024 Hexathlon.\n",
+    "\n",
+    "IMC24 Starter came to existance thanks to [imc-understanding-the-baseline][1]. The metric score for mean average accuracy came from [IMC2024-3D-metric-evaluation-example][2].<br>\n",
+    "To further modify the code for submission and scoring, the utility script can be accessed [here][3].\n",
+    "\n",
+    "[1]: https://www.kaggle.com/code/asarvazyan/imc-understanding-the-baseline\n",
+    "[2]: https://www.kaggle.com/code/fabiobellavia/imc2024-3d-metric-evaluation-example\n",
+    "[3]: https://www.kaggle.com/code/nartaa/imc24"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3dd1a51d",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003777,
+     "end_time": "2024-05-27T21:29:51.916073",
+     "exception": false,
+     "start_time": "2024-05-27T21:29:51.912296",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# SETUP"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "0f4aa7b8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-27T21:29:51.925438Z",
+     "iopub.status.busy": "2024-05-27T21:29:51.925069Z",
+     "iopub.status.idle": "2024-05-27T21:30:58.085805Z",
+     "shell.execute_reply": "2024-05-27T21:30:58.084821Z"
+    },
+    "papermill": {
+     "duration": 66.168007,
+     "end_time": "2024-05-27T21:30:58.087989",
+     "exception": false,
+     "start_time": "2024-05-27T21:29:51.919982",
+     "status": "completed"
+    },
+    "scrolled": true,
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from imc24 import *"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "aa2f0747",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003692,
+     "end_time": "2024-05-27T21:30:58.095876",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.092184",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# SIMILLIAR PAIRS"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8b7843ff",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003597,
+     "end_time": "2024-05-27T21:30:58.103410",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.099813",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f918ba72",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003575,
+     "end_time": "2024-05-27T21:30:58.110753",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.107178",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# KEYPOINTS EXTRACTOR AND MATCHER"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "bbcf0d6b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-27T21:30:58.120422Z",
+     "iopub.status.busy": "2024-05-27T21:30:58.120113Z",
+     "iopub.status.idle": "2024-05-27T21:30:58.142653Z",
+     "shell.execute_reply": "2024-05-27T21:30:58.141828Z"
+    },
+    "papermill": {
+     "duration": 0.029908,
+     "end_time": "2024-05-27T21:30:58.144715",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.114807",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def get_pairs(images_list,device=DEVICE):\n",
+    "    if EXHAUSTIVE:\n",
+    "        return list(combinations(range(len(images_list)), 2)) \n",
+    "    \n",
+    "    processor = AutoImageProcessor.from_pretrained('/kaggle/input/dinov2/pytorch/large/1')\n",
+    "    model = AutoModel.from_pretrained('/kaggle/input/dinov2/pytorch/large/1').eval().to(DEVICE)\n",
+    "    embeddings = []\n",
+    "    \n",
+    "    for img_path in images_list:\n",
+    "        image = K.io.load_image(img_path, K.io.ImageLoadType.RGB32, device=DEVICE)[None, ...]\n",
+    "        with torch.inference_mode():\n",
+    "            inputs = processor(images=image, return_tensors=\"pt\", do_rescale=False ,do_resize=True, \n",
+    "                               do_center_crop=True, size=224).to(DEVICE)\n",
+    "            outputs = model(**inputs)\n",
+    "            embedding = F.normalize(outputs.last_hidden_state.max(dim=1)[0])\n",
+    "        embeddings.append(embedding)\n",
+    "        \n",
+    "    embeddings = torch.cat(embeddings, dim=0)\n",
+    "    distances = torch.cdist(embeddings,embeddings).cpu()\n",
+    "    distances_ = (distances <= DISTANCES_THRESHOLD).numpy()\n",
+    "    np.fill_diagonal(distances_,False)\n",
+    "    z = distances_.sum(axis=1)\n",
+    "    idxs0 = np.where(z == 0)[0]\n",
+    "    for idx0 in idxs0:\n",
+    "        t = np.argsort(distances[idx0])[1:MIN_PAIRS]\n",
+    "        distances_[idx0,t] = True\n",
+    "        \n",
+    "    s = np.where(distances >= TOLERANCE)\n",
+    "    distances_[s] = False\n",
+    "    \n",
+    "    idxs = []\n",
+    "    for i in range(len(images_list)):\n",
+    "        for j in range(len(images_list)):\n",
+    "            if distances_[i][j]:\n",
+    "                idxs += [(i,j)] if i<j else [(j,i)]\n",
+    "    \n",
+    "    idxs = list(set(idxs))\n",
+    "    return idxs\n",
+    "\n",
+    "def keypoints_matches(images_list,pairs):\n",
+    "    extractor = ALIKED(max_num_keypoints=MAX_NUM_KEYPOINTS,detection_threshold=DETECTION_THRESHOLD,resize=RESIZE_TO).eval().to(DEVICE)\n",
+    "    matcher = KF.LightGlueMatcher(\"aliked\", {'width_confidence':-1, 'depth_confidence':-1, 'mp':True if 'cuda' in str(DEVICE) else False}).eval().to(DEVICE)\n",
+    "    rotation = create_model(\"swsl_resnext50_32x4d\").eval().to(DEVICE)\n",
+    "    \n",
+    "    with h5py.File(\"keypoints.h5\", mode=\"w\") as f_kp, h5py.File(\"descriptors.h5\", mode=\"w\") as f_desc:  \n",
+    "        for image_path in images_list:\n",
+    "            with torch.inference_mode():\n",
+    "                image = load_image(image_path).to(DEVICE)\n",
+    "                feats = extractor.extract(image)\n",
+    "                f_kp[image_path.name] = feats[\"keypoints\"].squeeze().cpu().numpy()\n",
+    "                f_desc[image_path.name] = feats[\"descriptors\"].squeeze().detach().cpu().numpy()\n",
+    "                \n",
+    "    with h5py.File(\"keypoints.h5\", mode=\"r\") as f_kp, h5py.File(\"descriptors.h5\", mode=\"r\") as f_desc, \\\n",
+    "         h5py.File(\"matches.h5\", mode=\"w\") as f_matches:  \n",
+    "        for pair in pairs:\n",
+    "            key1, key2 = images_list[pair[0]].name, images_list[pair[1]].name\n",
+    "            kp1 = torch.from_numpy(f_kp[key1][...]).to(DEVICE)\n",
+    "            kp2 = torch.from_numpy(f_kp[key2][...]).to(DEVICE)\n",
+    "            desc1 = torch.from_numpy(f_desc[key1][...]).to(DEVICE)\n",
+    "            desc2 = torch.from_numpy(f_desc[key2][...]).to(DEVICE)\n",
+    "            with torch.inference_mode():\n",
+    "                _, idxs = matcher(desc1, desc2, KF.laf_from_center_scale_ori(kp1[None]), KF.laf_from_center_scale_ori(kp2[None]))\n",
+    "            if len(idxs): group = f_matches.require_group(key1)\n",
+    "            if len(idxs) >= MIN_MATCHES: group.create_dataset(key2, data=idxs.detach().cpu().numpy())\n",
+    "                \n",
+    "                \n",
+    "\n",
+    "\n",
+    "def ransac_and_sparse_reconstruction(images_path):\n",
+    "    now = datetime.datetime.now()\n",
+    "    time_str = now.strftime(\"%Y-%m-%d_%H-%M-%S\")\n",
+    "    db_name = f'colmap_{time_str}.db'\n",
+    "    db = COLMAPDatabase.connect(db_name)\n",
+    "    db.create_tables()\n",
+    "    fname_to_id = add_keypoints(db, '/kaggle/working/', images_path, '', 'simple-pinhole', False)\n",
+    "    add_matches(db, '/kaggle/working/',fname_to_id)\n",
+    "    db.commit()\n",
+    "    \n",
+    "    pycolmap.match_exhaustive(db_name, sift_options={'num_threads':1})\n",
+    "    maps = pycolmap.incremental_mapping(\n",
+    "        database_path=db_name, \n",
+    "        image_path=images_path,\n",
+    "        output_path='/kaggle/working/', \n",
+    "        options=pycolmap.IncrementalPipelineOptions({'min_model_size':MIN_MODEL_SIZE, 'max_num_models':MAX_NUM_MODELS, 'num_threads':1})\n",
+    "    )\n",
+    "    return maps\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "7840a08e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-27T21:30:58.153549Z",
+     "iopub.status.busy": "2024-05-27T21:30:58.153257Z",
+     "iopub.status.idle": "2024-05-27T21:30:58.158166Z",
+     "shell.execute_reply": "2024-05-27T21:30:58.157348Z"
+    },
+    "papermill": {
+     "duration": 0.011519,
+     "end_time": "2024-05-27T21:30:58.160124",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.148605",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# SIMILLIAR PAIRS\n",
+    "EXHAUSTIVE = True\n",
+    "MIN_PAIRS = 50\n",
+    "DISTANCES_THRESHOLD = 0.3\n",
+    "TOLERANCE = 500\n",
+    "\n",
+    "# KEYPOINTS EXTRACTOR AND MATCHER\n",
+    "MAX_NUM_KEYPOINTS = 4096\n",
+    "RESIZE_TO = 1280\n",
+    "DETECTION_THRESHOLD = 0.005\n",
+    "MIN_MATCHES = 100\n",
+    "\n",
+    "# RANSAC AND SPARSE RECONSTRUCTION\n",
+    "MIN_MODEL_SIZE = 5\n",
+    "MAX_NUM_MODELS = 3\n",
+    "\n",
+    "# CROSS VALIDATION\n",
+    "N_SAMPLES = 50\n",
+    "\n",
+    "SUBMISSION = True"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d53b08cb",
+   "metadata": {
+    "papermill": {
+     "duration": 0.00365,
+     "end_time": "2024-05-27T21:30:58.167678",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.164028",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# RANSAC AND SPARSE RECONSTRUCTION"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "672a66a6",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-27T21:30:58.176601Z",
+     "iopub.status.busy": "2024-05-27T21:30:58.176336Z",
+     "iopub.status.idle": "2024-05-27T21:30:58.185470Z",
+     "shell.execute_reply": "2024-05-27T21:30:58.184714Z"
+    },
+    "papermill": {
+     "duration": 0.015855,
+     "end_time": "2024-05-27T21:30:58.187401",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.171546",
+     "status": "completed"
+    },
+    "scrolled": true,
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "if not SUBMISSION:\n",
+    "    def image_path(row):\n",
+    "        row['image_path'] = 'train/' + row['dataset'] + '/images/' + row['image_name']\n",
+    "        return row\n",
+    "\n",
+    "    train_df = pd.read_csv(f'{IMC_PATH}/train/train_labels.csv')\n",
+    "    train_df = train_df.apply(image_path,axis=1).drop_duplicates(subset=['image_path'])\n",
+    "    G = train_df.groupby(['dataset','scene'])['image_path']\n",
+    "    image_paths = []\n",
+    "    \n",
+    "    for g in G:\n",
+    "        n = N_SAMPLES\n",
+    "        n = n if n < len(g[1]) else len(g[1])\n",
+    "        g = g[0],g[1].sample(n,random_state=42).reset_index(drop=True)\n",
+    "        for image_path in g[1]:\n",
+    "            image_paths.append(image_path)\n",
+    "        \n",
+    "    gt_df = train_df[train_df.image_path.isin(image_paths)].reset_index(drop=True)\n",
+    "    pred_df = gt_df[['image_path','dataset','scene','rotation_matrix','translation_vector']]\n",
+    "    pred_df.to_csv('pred_df.csv',index=False)\n",
+    "    run('pred_df.csv', get_pairs, keypoints_matches, ransac_and_sparse_reconstruction, submit=False)\n",
+    "    pred_df = pd.read_csv('submission.csv')\n",
+    "    mAA = round(score(gt_df, pred_df),4)\n",
+    "    print('*** Total mean Average Accuracy ***')\n",
+    "    print(f\"mAA: {mAA}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9c0bc225",
+   "metadata": {
+    "papermill": {
+     "duration": 0.003627,
+     "end_time": "2024-05-27T21:30:58.194844",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.191217",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# SUBMISSION"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "9083d44e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-27T21:30:58.204258Z",
+     "iopub.status.busy": "2024-05-27T21:30:58.203584Z",
+     "iopub.status.idle": "2024-05-27T21:37:51.258716Z",
+     "shell.execute_reply": "2024-05-27T21:37:51.257995Z"
+    },
+    "papermill": {
+     "duration": 413.062055,
+     "end_time": "2024-05-27T21:37:51.260680",
+     "exception": false,
+     "start_time": "2024-05-27T21:30:58.198625",
+     "status": "completed"
+    },
+    "scrolled": true,
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "if SUBMISSION:\n",
+    "    data_path = IMC_PATH + \"/sample_submission.csv\"\n",
+    "    run(data_path, get_pairs, keypoints_matches, ransac_and_sparse_reconstruction)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "gpu",
+   "dataSources": [
+    {
+     "databundleVersionId": 8143495,
+     "sourceId": 71885,
+     "sourceType": "competition"
+    },
+    {
+     "datasetId": 4628051,
+     "sourceId": 7884485,
+     "sourceType": "datasetVersion"
+    },
+    {
+     "datasetId": 4628331,
+     "sourceId": 7884725,
+     "sourceType": "datasetVersion"
+    },
+    {
+     "sourceId": 172469456,
+     "sourceType": "kernelVersion"
+    },
+    {
+     "sourceId": 173217852,
+     "sourceType": "kernelVersion"
+    },
+    {
+     "modelInstanceId": 3326,
+     "sourceId": 4534,
+     "sourceType": "modelInstanceVersion"
+    },
+    {
+     "isSourceIdPinned": true,
+     "modelInstanceId": 3327,
+     "sourceId": 4535,
+     "sourceType": "modelInstanceVersion"
+    },
+    {
+     "isSourceIdPinned": true,
+     "modelInstanceId": 3329,
+     "sourceId": 4537,
+     "sourceType": "modelInstanceVersion"
+    },
+    {
+     "modelInstanceId": 14317,
+     "sourceId": 17191,
+     "sourceType": "modelInstanceVersion"
+    },
+    {
+     "modelInstanceId": 14611,
+     "sourceId": 17555,
+     "sourceType": "modelInstanceVersion"
+    },
+    {
+     "isSourceIdPinned": true,
+     "modelInstanceId": 24266,
+     "sourceId": 28822,
+     "sourceType": "modelInstanceVersion"
+    }
+   ],
+   "dockerImageVersionId": 30683,
+   "isGpuEnabled": true,
+   "isInternetEnabled": false,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.13"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 485.458551,
+   "end_time": "2024-05-27T21:37:54.427207",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2024-05-27T21:29:48.968656",
+   "version": "2.5.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
